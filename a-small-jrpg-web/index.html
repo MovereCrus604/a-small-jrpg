@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>A SMALL JRPG</title>
+  <meta name="description" content="속성과 선택의 모험 - A SMALL JRPG (모바일/웹 버전)">
+  <meta name="theme-color" content="#141a29">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="A SMALL JRPG">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage" aria-live="polite"></div>
+
+  <!-- 터치 기기를 세로로 들고 있을 때만 표시 (게임 화면은 가로 비율 기준) -->
+  <div id="rotate" role="alert">
+    <div class="phone" aria-hidden="true"></div>
+    <p>화면을 가로로 돌려주세요</p>
+    <small>Please rotate your device to landscape</small>
+  </div>
+
+  <noscript><p style="color:#fff;padding:2em">이 게임은 JavaScript가 필요합니다.</p></noscript>
+
+  <script src="js/core.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+  <script>
+    window.JRPGUI.init(document.getElementById('stage'));
+    window.JRPG.start();
+  </script>
+</body>
+</html>
