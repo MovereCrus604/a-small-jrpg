@@ -63,10 +63,25 @@
     box(cv, 'Title Panel', V(0.25, 0.66), V(0.75, 0.91), C(0.14, 0.17, 0.25));
     text(cv, 'Game Title', 'A SMALL JRPG', 54, 4, V(0.25, 0.75), V(0.75, 0.88), GOLD);
     text(cv, 'Game Subtitle', '속성과 선택의 모험', 28, 4, V(0.25, 0.68), V(0.75, 0.76), WHITE);
-    menuBtn(cv, 'Start Game', '게임 시작하기', V(0.35, 0.53), V(0.65, 0.62), startGame);
-    menuBtn(cv, 'Rebirth Shop', '환생 상점', V(0.35, 0.41), V(0.65, 0.50), showRebirthShop);
-    menuBtn(cv, 'Open Settings', '설정', V(0.35, 0.29), V(0.65, 0.38), showSettings);
+    // The original has four button slots (start / rebirth / settings / quit). The quit slot is unused on
+    // the web, so a saved journey adds "이어하기" on top and the others shift down one slot.
+    const slot = (i) => [V(0.35, 0.53 - 0.12 * i), V(0.65, 0.62 - 0.12 * i)];
+    let i = 0;
+    if (loadRun()) menuBtn(cv, 'Continue Game', '이어하기', ...slot(i++), resumeRun);
+    menuBtn(cv, 'Start Game', '게임 시작하기', ...slot(i++), startGame);
+    menuBtn(cv, 'Rebirth Shop', '환생 상점', ...slot(i++), showRebirthShop);
+    menuBtn(cv, 'Open Settings', '설정', ...slot(i++), showSettings);
     // "게임 종료하기" (Application.Quit) has no meaning in a browser, so it is not shown.
+  }
+
+  // A new journey while another one is saved: ask first (the old one cannot be resumed afterwards).
+  function showNewGameConfirm() {
+    const cv = U.newCanvas('New Game Confirm Canvas');
+    box(cv, 'Background', V(0, 0), V(1, 1), C(0.08, 0.10, 0.16));
+    text(cv, 'Confirm Title', '진행 중인 여정이 있습니다', 42, 4, V(0.22, 0.72), V(0.78, 0.86), WHITE);
+    text(cv, 'Confirm Description', '새로 시작하면 저장된 여정은 이어서 할 수 없고,\n그 여정의 정산 골드도 받지 못합니다.', 26, 4, V(0.18, 0.48), V(0.82, 0.66), WHITE);
+    menuBtn(cv, 'Confirm New Game', '새로 시작하기', V(0.28, 0.31), V(0.52, 0.41), () => { clearRun(); G.selectedWeapon = null; buildWeaponSelection(); });
+    menuBtn(cv, 'Cancel New Game', '취소', V(0.55, 0.31), V(0.72, 0.41), showMainMenu);
   }
 
   const fsSupported = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
@@ -279,6 +294,7 @@
   //  New run: weapon selection
   // ==============================================================================================================
   function startGame() {
+    if (loadRun()) { showNewGameConfirm(); return; }
     G.selectedWeapon = null;
     buildWeaponSelection();
   }
@@ -335,6 +351,13 @@
     };
     G.battleItems = { [BI.SpPotion]: 1, [BI.HpPotion]: 1, [BI.StrangePotion]: 1 };
     G.gold = 0; G.hardBattleCount = 0; G.eventGoldEarned = 0; G.bossDefeated = false; G.runSettled = false;
+    G.restUsed = false; G.upgradeUsed = false;
+    buildNodes();
+    G.currentNodeId = 'start';
+  }
+
+  function buildNodes() {
+    G.nodes = {};
     addNode('start', '시작', RT.Battle, 0.06, 0.67, true);
     addNode('battle1', '전투', RT.Battle, 0.17, 0.67);
     addNode('battle2', '전투', RT.Battle, 0.28, 0.67);
@@ -358,7 +381,6 @@
     connect('branchHard', ['branchShop']);
     connect('branchShop', ['rest2']);
     connect('rest2', ['boss']);
-    G.currentNodeId = 'start';
   }
 
   const NODE_COLORS = {
@@ -372,6 +394,7 @@
   const ICONS = { [RT.Event]: '?', [RT.Battle]: '⚔', [RT.HardBattle]: '☠', [RT.Rest]: '🔥', [RT.Shop]: '💰', [RT.Boss]: '☠⚔' };
 
   function showFieldMap() {
+    saveRun({ s: 'map' });
     const cv = U.newCanvas('Field Map Canvas');
     box(cv, 'Map Background', V(0, 0), V(1, 1), C(0.09, 0.13, 0.17));
     text(cv, 'Map Title', '테스트 경로', 43, 4, V(0.25, 0.93), V(0.65, 0.99), GOLD);
@@ -444,6 +467,7 @@
   }
 
   function showCharacterMenu() {
+    saveRun({ s: 'character' });
     const p = G.player;
     const cv = U.newCanvas('Character Status Canvas');
     box(cv, 'Character Status Background', V(0, 0), V(1, 1), C(0.09, 0.12, 0.17));
@@ -495,6 +519,7 @@
   //  Event room (suspicious traveler)
   // ==============================================================================================================
   function showSuspiciousTraveler(result) {
+    saveRun({ s: 'event', a: result });
     const cv = U.newCanvas('Event Room Canvas');
     box(cv, 'Event Background', V(0, 0), V(1, 1), C(0.14, 0.17, 0.24));
     text(cv, 'Event Name', '수상한 나그네', 40, 4, V(0.18, 0.78), V(0.82, 0.91), WHITE);
@@ -524,6 +549,7 @@
   //  Shop
   // ==============================================================================================================
   function showShopRoom() {
+    saveRun({ s: 'shop' });
     const cv = U.newCanvas('Shop Room Canvas');
     box(cv, 'Shop Background', V(0, 0), V(1, 1), C(0.18, 0.16, 0.13));
     text(cv, 'Shop Title', '상점', 42, 4, V(0.35, 0.82), V(0.65, 0.93), WHITE);
@@ -534,6 +560,7 @@
   }
 
   function showShopMerchant(notice) {
+    saveRun({ s: 'merchant', a: notice });
     const cv = U.newCanvas('Merchant UI Canvas');
     box(cv, 'Merchant Background', V(0, 0), V(1, 1), C(0.14, 0.13, 0.13));
     U.image(cv, 'Merchant Portrait', 'merchant', V(0.18, 0.27), V(0.42, 0.73));
@@ -547,6 +574,7 @@
   const ownsShopWeapon = (name) => G.ownedWeapons.some((w) => w && w.name === name);
 
   function showShopPurchase(notice) {
+    saveRun({ s: 'purchase', a: notice });
     const cv = U.newCanvas('Shop Purchase Canvas');
     box(cv, 'Purchase Background', V(0, 0), V(1, 1), C(0.13, 0.16, 0.20));
     text(cv, 'Purchase Title', '상품 구매', 38, 4, V(0.30, 0.87), V(0.70, 0.96), WHITE);
@@ -583,6 +611,7 @@
   //  Rest site
   // ==============================================================================================================
   function showRestRoom(notice) {
+    saveRun({ s: 'rest', a: notice });
     const cv = U.newCanvas('Rest Room Canvas');
     box(cv, 'Rest Background', V(0, 0), V(1, 1), C(0.12, 0.18, 0.16));
     text(cv, 'Rest Title', '휴식처', 42, 4, V(0.35, 0.82), V(0.65, 0.93), WHITE);
@@ -592,6 +621,7 @@
   }
 
   function showRestOptions(notice) {
+    saveRun({ s: 'restOptions', a: notice });
     const p = G.player;
     const cv = U.newCanvas('Rest Options Canvas');
     box(cv, 'Rest Options Background', V(0, 0), V(1, 1), C(0.12, 0.18, 0.16));
@@ -624,6 +654,7 @@
   const baseEquipmentName = (n) => { const i = n.lastIndexOf('+'); return i > 0 && /^-?\d+$/.test(n.slice(i + 1)) ? n.slice(0, i) : n; };
 
   function showRestUpgradeMenu(notice) {
+    saveRun({ s: 'upgrade', a: notice });
     const p = G.player;
     const cv = U.newCanvas('Equipment Upgrade Canvas');
     box(cv, 'Upgrade Background', V(0, 0), V(1, 1), C(0.12, 0.18, 0.16));
@@ -661,6 +692,7 @@
   function endRun(won) {
     if (G.runSettled) return;
     G.runSettled = true;
+    clearRun(); // the journey is over; nothing left to resume
     const nodes = G.visited.size * 10;
     const hard = G.hardBattleCount * 10;
     const boss = G.bossDefeated ? 100 : 0;
@@ -684,6 +716,12 @@
   //  Battle
   // ==============================================================================================================
   function buildBattle(title, def) {
+    buildBattleScreen(title + '에 들어섰다!', def);
+    beginPlayerTurn();
+  }
+
+  // Creates the battle UI (also used when a saved battle is restored); does not start a turn.
+  function buildBattleScreen(messageText, def) {
     G.enemies = [];
     G.playerTurn = false; G.battleOver = false;
     G.incIncrease = 0; G.incTurns = 0; G.atkReduction = 0; G.atkTurns = 0; G.playerStunnedNext = false;
@@ -692,11 +730,11 @@
     box(cv, 'Battlefield', V(0, 0.44), V(1, 1), C(0.16, 0.20, 0.29));
     box(cv, 'Party Area', V(0, 0), V(1, 0.44), C(0.10, 0.12, 0.18));
     box(cv, 'Divider', V(0, 0.435), V(1, 0.445), C(0.88, 0.71, 0.39));
-    G.message = text(cv, 'Battle Message', title + '에 들어섰다!', 38, 4, V(0.12, 0.84), V(0.88, 0.96), WHITE);
+    G.message = text(cv, 'Battle Message', messageText, 38, 4, V(0.12, 0.84), V(0.88, 0.96), WHITE);
     text(cv, 'Enemy Heading', 'ENCOUNTER', 24, 4, V(0.35, 0.91), V(0.65, 0.98), C(0.96, 0.78, 0.48));
     createPlayerCard(cv);
     createEnemy(cv, def || J.createSkeletonKnight(), V(0.5, 0.58));
-    beginPlayerTurn();
+    return G.enemies[0];
   }
 
   function createPlayerCard(parent) {
@@ -783,6 +821,7 @@
     setCommandsVisible(true);
     showMainCommands();
     refreshPlayerCard();
+    saveRun({ s: 'battle' }, battleSnapshot('player'));
   }
 
   // ---- command lists -------------------------------------------------------------------------------------------------------
@@ -1012,6 +1051,7 @@
 
   // ---- enemy turn (coroutine in the original) ------------------------------------------------------------------------------------
   async function enemyTurn() {
+    saveRun({ s: 'battle' }, battleSnapshot('enemy')); // the player's action is already applied
     await U.sleep(750);
     const p = G.player;
     for (const v of G.enemies) {
@@ -1076,9 +1116,163 @@
     else if (node.type === RT.HardBattle) reward = J.randInt(75, 151);
     G.gold += reward;
     setMessage(msg + '  여정 골드 ' + reward + 'G 획득!');
+    saveRun({ s: 'map' }); // reward is kept; a reload after the victory lands on the map
     const cv = U.stage.querySelector('.canvas');
     menuBtn(cv, 'Return To Map', '지도 보기', V(0.38, 0.35), V(0.62, 0.44), showFieldMap);
     U.fit(cv);
+  }
+
+  // ==============================================================================================================
+  //  Journey save / resume (web only)
+  //  The Windows build keeps nothing between launches except the permanent (rebirth) progress, so closing the
+  //  game abandoned the journey. In a browser a reload / killed tab is common, so the journey in progress is
+  //  written to localStorage (per browser, no server) at every screen change and at the start of every battle
+  //  turn, and the title screen offers "이어하기".
+  // ==============================================================================================================
+  const SAVE_KEY = 'RunSave';
+  const SAVE_VERSION = 1;
+  const ENEMY_FACTORY = {
+    '해골 기사': J.createSkeletonKnight, '해골 방패병': J.createSkeletonShieldBearer,
+    '해골 마법사': J.createSkeletonMage, '해골 군주': J.createSkeletonLord,
+  };
+
+  const serializeEquipment = (e) => ({
+    name: e.name, isWeapon: e.isWeapon, wt: e.weaponDamageType, atk: e.attackBonus, def: e.defenseBonus,
+    hp: e.hpBonus, sp: e.spBonus, up: e.upgradeLevel, res: e.resist.map((r) => [r.type, r.level]),
+  });
+  function deserializeEquipment(o) {
+    const e = new J.Equipment(o.name, o.isWeapon);
+    e.weaponDamageType = o.wt; e.attackBonus = o.atk; e.defenseBonus = o.def; e.hpBonus = o.hp; e.spBonus = o.sp;
+    e.upgradeLevel = o.up; e.resist = o.res.map(([type, level]) => ({ type, level }));
+    return e;
+  }
+
+  function battleSnapshot(phase) {
+    return {
+      phase,
+      message: G.message.firstChild.textContent,
+      enemies: G.enemies.map((v) => ({
+        name: v.def.enemyName, hp: v.stats.currentHp, planned: v.def.actions.indexOf(v.plannedAction),
+        defending: v.isDefending, stunned: v.isStunned, pdi: v.pendingDamageIncrease,
+        btn: !v.button.classList.contains('dis'), // original quirk: enemy button starts enabled
+      })),
+      flags: {
+        stunNext: G.playerStunnedNext, inc: G.incIncrease, incT: G.incTurns, atkR: G.atkReduction, atkT: G.atkTurns,
+        pd: G.pendingDouble, pc: G.pendingCowardly, pmt: G.pendingMagicType, pmm: G.pendingMagicMult,
+        pms: G.pendingMagicSp, pst: G.pendingStrangeThrow,
+      },
+    };
+  }
+
+  function makeSnapshot(ui, battle) {
+    const p = G.player;
+    const equip = [];
+    const idx = (e) => { if (!e) return -1; let i = equip.indexOf(e); if (i < 0) { i = equip.length; equip.push(e); } return i; };
+    const snap = {
+      v: SAVE_VERSION, ui,
+      player: { maxHp: p.maxHp, maxSp: p.maxSp, attack: p.attack, defense: p.defense, hp: p.currentHp, sp: p.currentSp, enchant: p.enchant, weapon: idx(p.weapon), armor: p.armor.map(idx) },
+      ownedWeapons: G.ownedWeapons.map(idx), ownedArmor: G.ownedArmor.map(idx), upgraded: [...G.upgradedAtRest].map(idx),
+      run: {
+        gold: G.gold, hardBattleCount: G.hardBattleCount, eventGoldEarned: G.eventGoldEarned, bossDefeated: G.bossDefeated,
+        visited: [...G.visited], currentNodeId: G.currentNodeId, restUsed: G.restUsed, upgradeUsed: G.upgradeUsed,
+        inventory: G.inventory.slice(), battleItems: Object.assign({}, G.battleItems), shopPrices: Object.assign({}, G.shopPrices),
+      },
+      battle: battle || null,
+      equip: null,
+    };
+    snap.equip = equip.map(serializeEquipment); // after idx(): equipment shared between player / owned lists keeps one identity
+    return snap;
+  }
+
+  function saveRun(ui, battle) {
+    if (!G.player || G.runSettled) return;
+    try { Prefs.set(SAVE_KEY, JSON.stringify(makeSnapshot(ui, battle))); } catch (e) { /* storage full / blocked: play on without saving */ }
+  }
+  const clearRun = () => Prefs.del(SAVE_KEY);
+  function loadRun() {
+    try {
+      const raw = Prefs.raw(SAVE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return s && s.v === SAVE_VERSION && s.player && s.run && Array.isArray(s.equip) ? s : null;
+    } catch (e) { return null; }
+  }
+
+  function applyRunState(s) {
+    const eq = s.equip.map(deserializeEquipment);
+    const get = (i) => (i >= 0 ? eq[i] : null);
+    const p = new J.Combatant();
+    p.name = '주인공';
+    p.maxHp = s.player.maxHp; p.maxSp = s.player.maxSp; p.attack = s.player.attack; p.defense = s.player.defense;
+    p.currentHp = s.player.hp; p.currentSp = s.player.sp; p.enchant = s.player.enchant == null ? null : s.player.enchant;
+    p.weapon = get(s.player.weapon); p.armor = s.player.armor.map(get).filter(Boolean);
+    G.player = p;
+    G.selectedWeapon = p.weapon;
+    G.ownedWeapons = s.ownedWeapons.map(get).filter(Boolean);
+    G.ownedArmor = s.ownedArmor.map(get).filter(Boolean);
+    G.upgradedAtRest = new Set(s.upgraded.map(get).filter(Boolean));
+    const r = s.run;
+    G.gold = r.gold; G.hardBattleCount = r.hardBattleCount; G.eventGoldEarned = r.eventGoldEarned; G.bossDefeated = !!r.bossDefeated;
+    G.visited = new Set(r.visited); G.currentNodeId = r.currentNodeId; G.restUsed = !!r.restUsed; G.upgradeUsed = !!r.upgradeUsed;
+    G.inventory = r.inventory.slice(); G.battleItems = Object.assign({}, r.battleItems); G.shopPrices = Object.assign({}, r.shopPrices);
+    G.runSettled = false; G.battleOver = false; G.playerTurn = false; G.enemies = [];
+    buildNodes();
+    if (!G.nodes[G.currentNodeId]) throw new Error('unknown node ' + G.currentNodeId);
+    if (!(p.currentHp > 0 && p.maxHp > 0)) throw new Error('invalid player');
+  }
+
+  function restoreBattle(s) {
+    const b = s.battle;
+    if (!b || !b.enemies || b.enemies.length !== 1 || !ENEMY_FACTORY[b.enemies[0].name]) throw new Error('invalid battle');
+    const e = b.enemies[0];
+    const v = buildBattleScreen(b.message, ENEMY_FACTORY[e.name]()); // resets the battle flags, so restore them afterwards
+    const f = b.flags;
+    G.playerStunnedNext = !!f.stunNext; G.incIncrease = f.inc; G.incTurns = f.incT; G.atkReduction = f.atkR; G.atkTurns = f.atkT;
+    G.pendingDouble = !!f.pd; G.pendingCowardly = !!f.pc; G.pendingMagicType = f.pmt == null ? null : f.pmt;
+    G.pendingMagicMult = f.pmm; G.pendingMagicSp = f.pms; G.pendingStrangeThrow = !!f.pst;
+    v.stats.currentHp = e.hp;
+    v.plannedAction = e.planned >= 0 ? v.def.actions[e.planned] : null;
+    v.isDefending = !!e.defending; v.isStunned = !!e.stunned; v.pendingDamageIncrease = e.pdi;
+    refreshEnemy(v);
+    v.button.setInteractable(!!e.btn);
+    v.intentLabel.setText(v.plannedAction ? '예고: ' + J.intentText(v) : '행동 예고: 준비 중');
+    refreshPlayerCard();
+    if (b.phase === 'player') {
+      G.playerTurn = true;
+      setCommandsVisible(true);
+      showMainCommands();
+      saveRun({ s: 'battle' }, battleSnapshot('player'));
+    } else {
+      G.playerTurn = false;
+      enemyTurn(); // re-runs the enemy phase from the saved point (the player's action is already applied)
+    }
+  }
+
+  function resumeRun() {
+    const s = loadRun();
+    if (!s) { showMainMenu(); return; }
+    try {
+      applyRunState(s);
+      const ui = s.ui || { s: 'map' };
+      const a = ui.a == null ? '' : String(ui.a);
+      switch (ui.s) {
+        case 'battle': restoreBattle(s); break;
+        case 'character': showCharacterMenu(); break;
+        case 'event': showSuspiciousTraveler(ui.a == null ? null : String(ui.a)); break;
+        case 'shop': showShopRoom(); break;
+        case 'merchant': showShopMerchant(a); break;
+        case 'purchase': showShopPurchase(a); break;
+        case 'rest': showRestRoom(a); break;
+        case 'restOptions': showRestOptions(a); break;
+        case 'upgrade': showRestUpgradeMenu(a); break;
+        default: showFieldMap();
+      }
+    } catch (e) {
+      console.warn('저장된 여정을 불러오지 못했습니다:', e);
+      G.player = null; // do not overwrite the save with half-restored state
+      clearRun();
+      showMainMenu();
+    }
   }
 
   // ---- boot ----------------------------------------------------------------------------------------------------------------------------
